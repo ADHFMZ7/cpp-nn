@@ -67,3 +67,12 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Project build and generated model artifacts
+/main
+/main_asan
+/main_debug
+/*.dSYM/
+/checkpoints/*.safetensors
+__pycache__/
+*.py[cod]
