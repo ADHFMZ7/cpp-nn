@@ -1,0 +1,35 @@
+#pragma once
+
+#include <memory>
+#include <cstddef>
+
+enum class Device {CUDA, CPU, MPS};
+
+class StorageDeleter {
+
+public:
+    explicit StorageDeleter(Device device);
+    void operator()(std::byte* ptr) const;
+
+private:
+    Device device_;
+};
+
+class Storage {
+
+public:
+    Storage(size_t size, Device device, std::unique_ptr<std::byte[], StorageDeleter> data);
+
+    // CUDA and MPS allocations are not implemented yet.
+    Storage(size_t size, Device device);
+
+    static std::byte* allocate(size_t size, Device device);
+
+    Device device() const;
+
+private:
+
+    std::unique_ptr<std::byte[], StorageDeleter> data_;
+    size_t bytes_;
+    Device device_;
+};
