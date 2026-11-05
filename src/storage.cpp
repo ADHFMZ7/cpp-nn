@@ -35,16 +35,11 @@ std::shared_ptr<Storage> Storage::from_file(const std::string& filename, size_t 
         throw std::runtime_error("Failed to open file: " + filename);
     }
 
-    std::byte* data_ptr = Storage::allocate(bytes, device);
+    auto storage = std::make_shared<Storage>(bytes, device);
+
     file.seekg(offset, std::ios::beg);
-    file.read(reinterpret_cast<char*>(data_ptr), bytes);
-
-    if (file.gcount() != bytes) 
-        throw std::runtime_error("Failed to read the expected number of bytes from file: " + filename);
-
-    file.close(); 
-
-    return std::make_shared<Storage>(bytes, device, std::unique_ptr<std::byte[], StorageDeleter>(data_ptr, StorageDeleter(device)));
+    file.read(reinterpret_cast<char*>(storage->data()), bytes);
+    return storage;
 }
 
 std::byte* Storage::allocate(size_t size, Device device) {

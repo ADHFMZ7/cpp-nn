@@ -18,6 +18,7 @@ add_executable(cpp-nn
     src/main.cpp
     src/storage.cpp
     src/tensor.cpp
+    src/util.cpp
 )
 
 target_compile_features(cpp-nn PRIVATE cxx_std_23)
