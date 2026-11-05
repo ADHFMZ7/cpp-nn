@@ -76,7 +76,7 @@ def main() -> None:
         "num_attention_heads": 1,
         "activation": "gelu",
         "normalization": "layer_norm",
-        "dtype": "float32",
+        "dtype": "float64",
         "training_task": "next_token_increment_mod_vocab",
     }
 
@@ -104,7 +104,7 @@ def main() -> None:
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     tensors = {
-        name: tensor.detach().to(device="cpu", dtype=torch.float32).contiguous()
+        name: tensor.detach().to(device="cpu", dtype=torch.float64).contiguous()
         for name, tensor in model.state_dict().items()
     }
     save_file(
@@ -112,6 +112,9 @@ def main() -> None:
         str(args.output),
         metadata={"config": json.dumps(config, sort_keys=True)},
     )
+
+    for name, tensor in tensors.items():
+        print(f"{name}\n {tensor}\n\n")
 
     print(f"Final training loss: {final_loss:.4f}")
     print(f"Saved {len(tensors)} tensors to {args.output}")
