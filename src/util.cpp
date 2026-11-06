@@ -21,8 +21,6 @@ std::map<std::string, Tensor> load_safetensors(const std::string& filename) {
 
     uint64_t json_length = *reinterpret_cast<uint64_t*>(header);
 
-    std::cout << "Json header length: " << json_length << std::endl;
-
     file.seekg(8, std::ios::beg);
 
     std::string json_header(json_length, '\0');
@@ -46,9 +44,6 @@ std::map<std::string, Tensor> load_safetensors(const std::string& filename) {
         // TODO: Handle different data types: value["dtype"]
 
         Tensor tensor {value["shape"], storage, data_offset / sizeof(double)};
-
-        std::cout << "Loaded tensor: " << key << " with shape: " << value["shape"] << std::endl;
-        tensor.print();
 
         tensors[key] = tensor;
     }
