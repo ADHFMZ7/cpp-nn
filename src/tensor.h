@@ -8,6 +8,7 @@
 #include <string>
 #include <memory>
 #include <functional>
+#include <ostream>
 
 class Tensor {
 
@@ -62,6 +63,7 @@ public:
 
     // Tensor ops
     Tensor reshape(const Shape& new_shape) const;
+    Tensor expand(const Shape& new_shape) const;
     Tensor transpose(size_t dim1, size_t dim2) const;
     Tensor sum(int axis = -1) const;
     Tensor mean(int axis = -1) const;
@@ -104,6 +106,7 @@ private:
     // std::function<void()> backward_fn_;
 };
 
+std::ostream& operator<<(std::ostream& out, const Tensor::Shape& shape);
 
 
 size_t numel(const Tensor::Shape& shape);

@@ -1,5 +1,6 @@
 #include "tensor.h"
 #include <algorithm>
+#include <cstdio>
 #include <functional>
 #include <numeric>
 #include <random>
@@ -12,6 +13,8 @@ namespace {
 
 std::string shape_to_string(const Tensor::Shape& shape);
 Tensor::Shape contiguous_strides(const Tensor::Shape& shape);
+Tensor::Shape broadcast_shape(const Tensor::Shape& lhs, const Tensor::Shape& rhs);
+void next_index(Tensor::Shape& ix, const Tensor::Shape& shape);
 
 } // namespace
 
@@ -137,16 +140,16 @@ Tensor Tensor::unary_op(Op op) const {
 template <class Op>
 Tensor Tensor::binary_op(const Tensor& other, Op op, const std::string& name) const {
 
-    if (shape_ != other.shape_) {
-        throw std::invalid_argument("Incompatible tensor shapes: cannot " + name + " " + shape_to_string(shape_) + " and " + shape_to_string(other.shape_));
-    }
+    const Shape out_shape = broadcast_shape(shape_, other.shape_);
+    const Tensor lhs = expand(out_shape);
+    const Tensor rhs = other.expand(out_shape);
 
-    const Tensor lhs = contiguous();
-    const Tensor rhs = other.contiguous();
-    Tensor tensor {shape_, 0.0};
+    Tensor tensor {out_shape, 0.0};
+    Shape ix(out_shape.size(), 0);
 
-    for (size_t ix = 0; ix < size(); ++ix) {
-        tensor.data()[ix] = op(lhs.data()[ix], rhs.data()[ix]);
+    for (size_t k = 0; k < tensor.size(); ++k) {
+        tensor.data()[k] = op(lhs[ix], rhs[ix]);
+        next_index(ix, out_shape);
     }
 
     return tensor;
@@ -164,6 +167,29 @@ Tensor Tensor::reshape(const Shape& new_shape) const {
     const Tensor src = contiguous();
 
     return Tensor {new_shape, src.storage_, src.offset_};
+}
+
+Tensor Tensor::expand(const Shape& new_shape) const {
+
+    if (new_shape.size() < ndim()) {
+        throw std::invalid_argument("Cannot expand " + shape_to_string(shape_) + " to " + shape_to_string(new_shape));
+    }
+
+    const size_t lead = new_shape.size() - ndim();
+
+    Tensor tensor {*this};
+    tensor.shape_ = new_shape;
+    tensor.stride_.assign(new_shape.size(), 0);     // new leading dims are broadcast
+
+    for (size_t d = 0; d < ndim(); ++d) {
+        if (shape_[d] == new_shape[lead + d]) {
+            tensor.stride_[lead + d] = stride_[d];
+        } else if (shape_[d] != 1) {
+            throw std::invalid_argument("Cannot expand " + shape_to_string(shape_) + " to " + shape_to_string(new_shape));
+        }
+    }
+
+    return tensor;
 }
 
 Tensor Tensor::transpose(size_t dim1, size_t dim2) const {
@@ -332,6 +358,17 @@ void Tensor::print() const {
 
 
 
+std::ostream& operator<<(std::ostream& out, const Tensor::Shape& shape) {
+    out << '[';
+    for (size_t i = 0; i < shape.size(); ++i) {
+        if (i != 0) {
+            out << ", ";
+        }
+        out << shape[i];
+    }
+    return out << ']';
+}
+
 Tensor::Shape flat_to_idx(size_t flat_idx, const Tensor::Shape& strides) {
     Tensor::Shape idx(strides.size());
 
@@ -354,14 +391,7 @@ namespace {
 
 std::string shape_to_string(const Tensor::Shape& shape) {
     std::ostringstream oss;
-    oss << "[";
-    for (size_t i = 0; i < shape.size(); ++i) {
-        if (i != 0) {
-            oss << ", ";
-        }
-        oss << shape[i];
-    }
-    oss << "]";
+    oss << shape;
     return oss.str();
 }
 
@@ -376,6 +406,33 @@ Tensor::Shape contiguous_strides(const Tensor::Shape& shape) {
     }
 
     return strides;
+}
+
+Tensor::Shape broadcast_shape(const Tensor::Shape& lhs, const Tensor::Shape& rhs) {
+
+    Tensor::Shape out (std::max(lhs.size(), rhs.size()), 1);
+
+    for (size_t i = 0; i < out.size(); ++i) {
+        const size_t da = i < lhs.size() ? lhs[lhs.size() - 1 - i] : 1;
+        const size_t db = i < rhs.size() ? rhs[rhs.size() - 1 - i] : 1;
+
+        if (da != db && da != 1 && db != 1) {
+            throw std::invalid_argument("Cannot broadcast " + shape_to_string(lhs) + " with " + shape_to_string(rhs));
+        }
+
+        out[out.size() - 1 - i] = std::max(da, db);
+    }
+
+    return out;
+}
+
+void next_index(Tensor::Shape& ix, const Tensor::Shape& shape) {
+    for (size_t d = shape.size(); d-- > 0;) {   // walk dims from last to first
+        if (++ix[d] < shape[d]) {               // bump this dim; still in range?
+            return;                             //   yes → done
+        }
+        ix[d] = 0;                              //   no → wrap to 0, carry into the next dim left
+    }
 }
 
 } // namespace
