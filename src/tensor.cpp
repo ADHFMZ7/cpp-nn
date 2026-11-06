@@ -39,11 +39,34 @@ Tensor::Tensor(const Shape& shape, const std::vector<double>& values)
 }
 
 Tensor::Tensor(const Shape& shape, std::shared_ptr<Storage> storage, size_t offset)
+    : Tensor {shape, contiguous_strides(shape), std::move(storage), offset}
+{}
+
+Tensor::Tensor(const Shape& shape, const Shape& stride, std::shared_ptr<Storage> storage, size_t offset)
     : offset_ {offset}
     , shape_ {shape}
-    , stride_ {contiguous_strides(shape)}
+    , stride_ {stride}
     , storage_ {std::move(storage)}
-{}
+{
+    if (stride_.size() != shape_.size()) {
+        throw std::invalid_argument("Stride rank does not match shape rank");
+    }
+
+    // Empty tensors never touch storage
+    if (size() == 0) {
+        return;
+    }
+
+    // The furthest element is the one with every index at its maximum
+    size_t last = offset_;
+    for (size_t d = 0; d < ndim(); ++d) {
+        last += (shape_[d] - 1) * stride_[d];
+    }
+
+    if (last >= storage_->nbytes() / sizeof(double)) {
+        throw std::out_of_range("Strided view exceeds storage");
+    }
+}
 
 Tensor Tensor::zeros(const Tensor::Shape& shape) {
     return Tensor(shape, 0.0);
@@ -200,6 +223,23 @@ Tensor Tensor::transpose(size_t dim1, size_t dim2) const {
     std::swap(tensor.stride_[dim1], tensor.stride_[dim2]);
 
     return tensor;
+}
+
+Tensor Tensor::slice(size_t dim, size_t start, size_t end, size_t step) {
+
+    if (dim >= ndim() || step == 0 || start > end || end > shape_[dim]) {
+        throw std::invalid_argument("Invalid slice of " + shape_to_string(shape_));
+    }
+
+    auto new_stride = stride_;
+    new_stride[dim] *= step;
+    
+    Shape new_shape = shape_;
+    new_shape[dim] = (end - start + step - 1) / step;
+    
+    size_t new_offset = offset_ + start * stride_[dim];
+
+    return Tensor {new_shape, new_stride, storage_, new_offset};
 }
 
 Tensor Tensor::sum(int axis) const {

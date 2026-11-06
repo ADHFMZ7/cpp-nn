@@ -65,6 +65,8 @@ public:
     Tensor reshape(const Shape& new_shape) const;
     Tensor expand(const Shape& new_shape) const;
     Tensor transpose(size_t dim1, size_t dim2) const;
+    Tensor slice(size_t dim, size_t start, size_t end, size_t step = 1);
+
     Tensor sum(int axis = -1) const;
     Tensor mean(int axis = -1) const;
     Tensor relu() const;
@@ -91,6 +93,9 @@ private:
 
     // Shared pointer allows for sharing data between tensors (e.g., views, slices)
     std::shared_ptr<Storage> storage_;
+
+    // Arbitrary strided view; checks that every element stays inside the storage
+    Tensor(const Shape& shape, const Shape& stride, std::shared_ptr<Storage> storage, size_t offset = 0);
 
     size_t offset_of(std::span<const size_t> ix) const;
 
